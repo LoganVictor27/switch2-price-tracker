@@ -1,0 +1,44 @@
+name: Resumen diario - Nintendo Switch 2
+
+on:
+  schedule:
+    # 08:00 UTC = 09:00 en España en horario de invierno, 10:00 en verano.
+    # Ajusta la hora si quieres que llegue siempre a la misma hora local.
+    - cron: "0 8 * * *"
+  workflow_dispatch: {}   # permite lanzarlo manualmente desde la pestaña "Actions"
+
+# Necesario para que el job pueda hacer "git push" con el histórico actualizado
+permissions:
+  contents: write
+
+jobs:
+  ejecutar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar el repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+
+      - name: Ejecutar scraping + resumen diario por email
+        env:
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+          EMAIL_TO: ${{ secrets.EMAIL_TO }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python main.py --resumen-diario
+
+      - name: Guardar el histórico de precios actualizado en el repo
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add database/precios.db
+          git diff --cached --quiet || git commit -m "Actualiza histórico de precios [skip ci]"
+          git push
